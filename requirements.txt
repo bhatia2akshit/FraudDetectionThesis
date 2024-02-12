@@ -1,0 +1,9 @@
+torch
+torchaudio
+torchvision
+transformers
+datasets
+sklearn
+seaborn
+diffusers
+psutil
