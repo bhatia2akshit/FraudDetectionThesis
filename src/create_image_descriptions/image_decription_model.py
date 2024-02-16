@@ -1,47 +1,46 @@
-import torch
-import torchvision.transforms as transforms
+import os
 from PIL import Image
-from transformers import VQGPT2LMHeadModel, VQGPT2Tokenizer
+import pandas as pd
 
-# Load pre-trained VQGPT-2 model and tokenizer
-tokenizer = VQGPT2Tokenizer.from_pretrained("EleutherAI/vqgan-gpt2-imagenet")
-model = VQGPT2LMHeadModel.from_pretrained("EleutherAI/vqgan-gpt2-imagenet")
+import torch
+from transformers import GPT2TokenizerFast, ViTImageProcessor, VisionEncoderDecoderModel
 
-# Define preprocessing function for images
-def preprocess_image(image_path):
-    image = Image.open(image_path)
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # Resize image to required size
-        transforms.ToTensor()           # Convert image to PyTorch tensor
-    ])
-    image = transform(image).unsqueeze(0)  # Add batch dimension
-    return image
+# load a fine-tuned image captioning model and corresponding tokenizer and image processor
+model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+tokenizer = GPT2TokenizerFast.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+image_processor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
 
-# Generate descriptions for images
-def generate_descriptions(image_paths):
-    descriptions = []
-    for image_path in image_paths:
-        # Preprocess image
-        image = preprocess_image(image_path)
-        # Generate description
-        input_text = tokenizer.decode(tokenizer.bos_token_id)
-        input_ids = tokenizer.encode(input_text, return_tensors="pt")
-        output = model.generate(input_ids=input_ids.to(model.device),
-                                pixel_values=image.to(model.device))
-        description = tokenizer.decode(output[0], skip_special_tokens=True)
-        descriptions.append(description)
-    return descriptions
+# Function to preprocess images and generate captions
+def process_images(images):
+    generated_texts = []
+    index=0
+    for image in images:
+        index+=1
+        if index%300==0:
+            print(f'{index} images have been processed. The last description is: {generated_texts[-1]}')
+        opened_image = Image.open(image_folder_path+image)
+        pixel_values = image_processor(opened_image, return_tensors="pt").pixel_values
+        generated_ids = model.generate(pixel_values)
+        generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        generated_texts.append([image, generated_text])  # appends the path along with generated text
+    return generated_texts
 
-# Example usage
+# Split image URLs into batches
+image_folder_path = '/upb/users/b/bakshit/profiles/unix/cs/FraudDetectionThesis/data/real/lsun/bedroom/'
+images = os.listdir(image_folder_path)
+batch_size = 32
+image_batches = [images[i:i+batch_size] for i in range(0, len(images), batch_size)]
 
+# Process images in batches
+all_generated_texts = []
+for batch in image_batches:
+    generated_texts_batch = process_images(batch)
+    all_generated_texts.extend(generated_texts_batch)
 
-# Example usage
+print('images are processed')
+df = pd.DataFrame(all_generated_texts)
+df.to_csv('/upb/users/b/bakshit/profiles/unix/cs/FraudDetectionThesis/data/captions/lsun/bedroom/captions.csv')
 
-main_folder = '/upb/users/b/bakshit/profiles/unix/cs/FraudDetectionThesis/'
-image_folder = main_folder + 'data/real/lsun/bedroom/'
-image_paths = [image_folder+"1.jpg", image_folder+"2.jpg", image_folder+"3.jpg"]
-captions = generate_descriptions(image_paths)
-for image_path, caption in zip(image_paths, captions):
-    print(f"Image: {image_path}, Caption: {caption}")
-
-
+# Print generated captions
+for text in all_generated_texts[:3]:
+    print(text)

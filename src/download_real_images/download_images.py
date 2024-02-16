@@ -2,10 +2,11 @@ from datasets import load_dataset
 import os
 
 # Load LSUN Bedrooms dataset
-dataset = load_dataset("pcuenq/stable_diffusion-bedrooms")
+dataset = load_dataset("pcuenq/lsun-bedrooms")
 
 # Specify the directory where you want to save the images
-output_directory = "./data/real/stable_diffusion/bedroom/"
+
+output_directory = "/upb/users/b/bakshit/profiles/unix/cs/FraudDetectionThesis/data/real/stable_diffusion/bedroom/"
 
 
 def write_images(threshold=3000):
